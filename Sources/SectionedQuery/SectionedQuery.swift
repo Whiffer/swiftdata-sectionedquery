@@ -17,12 +17,12 @@ import Algorithms
     
     @State private var sections = [SectionedResults<SectionIdentifier, Result>.Section<Result>]()
     @State private var needsFetch = true
-    @State private var notificationsTask: Task<Never, Never>?
+    @State private var notificationsTask: Task<Void, Never>?
     
-    // As of Beta 2 ModelContext.didSave Notifications are not being sent, so until they are,
+    // As of macOS Sonoma Release Candidate, ModelContext.didSave Notifications are not being sent, so until they are,
     // Core Data's NSManagedObjectContext.didSaveObjectsNotification is being used instead
     
-    // At some point this probably should be changed to the below
+    // At some point this probably should be changed to the line below it
     private let didSave = NSManagedObjectContext.didSaveObjectsNotification
     // private let didSave = ModelContext.didSave
 
@@ -72,13 +72,11 @@ extension SectionedQuery : DynamicProperty {
         if self.notificationsTask == nil {
             // Start a never ending Task to monitor when the ModelContext has saved changes
             self.notificationsTask = Task {
-                while true {
-                    //Workaround: https://developer.apple.com/forums/thread/718565
-                    for await /*name*/ _ in NotificationCenter.default.notifications(named: self.didSave).map( { $0.name } ) {
-                        // print("Observed: \(name.rawValue)")
-                        // Model Context has changes so need to reexecute the Fetch
-                        self.needsFetch = true
-                    }
+                //Workaround: https://developer.apple.com/forums/thread/718565
+                for await /*name*/ _ in NotificationCenter.default.notifications(named: self.didSave).map( { $0.name } ) {
+                    // print("Observed: \(name.rawValue)")
+                    // Model Context has changes so need to reexecute the Fetch
+                    self.needsFetch = true
                 }
             }
         }
