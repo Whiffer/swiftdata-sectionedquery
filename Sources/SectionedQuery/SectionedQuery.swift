@@ -19,13 +19,6 @@ import Algorithms
     @State private var needsFetch = true
     @State private var notificationsTask: Task<Void, Never>?
     
-    // As of macOS Sonoma Release Candidate, ModelContext.didSave Notifications are not being sent, so until they are,
-    // Core Data's NSManagedObjectContext.didSaveObjectsNotification is being used instead
-    
-    // At some point this probably should be changed to the line below it
-    private let didSave = NSManagedObjectContext.didSaveObjectsNotification
-    // private let didSave = ModelContext.didSave
-
     @Environment(\.modelContext) private var modelContext
 
     @MainActor public init(sectionIdentifier: KeyPath<Result, SectionIdentifier>, sortDescriptors: [SortDescriptor<Result>], predicate: Predicate<Result>? = nil, animation: Animation? = nil) {
@@ -54,8 +47,8 @@ import Algorithms
 
 extension SectionedQuery : DynamicProperty {
     
-    @MainActor public func update() {
-        Task {
+    nonisolated public func update() {
+        Task { @MainActor in
             if self.needsFetch {
                 self.setupNotificationsTask()
                 
@@ -70,11 +63,23 @@ extension SectionedQuery : DynamicProperty {
     private func setupNotificationsTask() {
         
         if self.notificationsTask == nil {
+            
+            // SwiftData's ModelContext.didSave Notifications are not being sent until macOS Sequoia,
+            // so until then, Core Data's NSManagedObjectContextDidSave is being used instead
+#if os(iOS)
+        let swiftDataNotification = ProcessInfo.processInfo.operatingSystemVersion.majorVersion > 17
+#endif
+#if os(macOS)
+        let swiftDataNotification = ProcessInfo.processInfo.operatingSystemVersion.majorVersion > 14
+#endif
+
+            let notificationName = swiftDataNotification ? ModelContext.didSave : .NSManagedObjectContextDidSaveObjectIDs
+
             // Start a never ending Task to monitor when the ModelContext has saved changes
             self.notificationsTask = Task {
                 //Workaround: https://developer.apple.com/forums/thread/718565
-                for await /*name*/ _ in NotificationCenter.default.notifications(named: self.didSave).map( { $0.name } ) {
-                    // print("Observed: \(name.rawValue)")
+                for await /*name*/ _ in NotificationCenter.default.notifications(named: notificationName).map( { $0.name } ) {
+//                     print("Observed: \(name.rawValue)")
                     // Model Context has changes so need to reexecute the Fetch
                     self.needsFetch = true
                 }
