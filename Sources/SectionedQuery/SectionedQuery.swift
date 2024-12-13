@@ -89,29 +89,29 @@ extension SectionedQuery : DynamicProperty {
     
     private func fetchSectionedResults() {
         
-        let fetchDescriptor = FetchDescriptor<Result>(predicate: self.configuration.predicate, sortBy: self.configuration.sortDescriptors)
-        
-        guard let fetchResults = try? self.modelContext.fetch(fetchDescriptor) else {
-            fatalError("Unresolved error")
-        }
-        
-        let sectionIdentifiers = fetchResults.map { $0[keyPath: self.configuration.sectionIdentifier] }
-        let uniqueSectionIdentifiers = Array(sectionIdentifiers.uniqued())
+        do {
+            let fetchDescriptor = FetchDescriptor<Result>(predicate: self.configuration.predicate, sortBy: self.configuration.sortDescriptors)
+            let fetchResults = try self.modelContext.fetch(fetchDescriptor)
+            let sections = fetchResults
+                .map { $0[keyPath: self.configuration.sectionIdentifier] }
+                .uniqued()
+                .compactMap { sectionIdentifier in
+                    
+                    if let firstIndex = fetchResults.firstIndex(where: { sectionIdentifier == $0[keyPath: self.configuration.sectionIdentifier] } ),
+                       let lastIndex = fetchResults.lastIndex(where: { sectionIdentifier == $0[keyPath: self.configuration.sectionIdentifier] } ) {
 
-        let sections = uniqueSectionIdentifiers.map { sectionIdentifier in
-            
-            guard let firstIndex = fetchResults.firstIndex(where: { sectionIdentifier == $0[keyPath: self.configuration.sectionIdentifier] } ) else {
-                fatalError("Unresolved error")
-            }
-            guard let lastIndex = fetchResults.lastIndex(where: { sectionIdentifier == $0[keyPath: self.configuration.sectionIdentifier] } ) else {
-                fatalError("Unresolved error")
-            }
-
-            let sectionElements = Array(fetchResults[firstIndex...lastIndex])
-            return SectionedResults<SectionIdentifier, Result>.Section(id: sectionIdentifier, elements: sectionElements )
+                        let sectionElements = Array(fetchResults[firstIndex...lastIndex])
+                        return SectionedResults<SectionIdentifier, Result>.Section(id: sectionIdentifier, elements: sectionElements )
+                    } else {
+                        assertionFailure("Internal consistency check failed. Unable to create a Section from the fetch results.")
+                        return nil
+                    }
+                }
+            self.sections = sections
+        } catch {
+            assertionFailure(error.localizedDescription)
+            self.sections = [SectionedResults<SectionIdentifier, Result>.Section<Result>]() // Errors return with empty results
         }
-        
-        self.sections = sections
     }
 
 }
