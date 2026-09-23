@@ -10,6 +10,12 @@ In any case, this is a custom property wrapper type that retrieves entities, gro
 
 Use a `SectionedQuery` property wrapper to declare a ``SectionedResults`` property that provides a grouped collection of SwiftData PersistentModel objects to a SwiftUI view. If you don't need sectioning, use the ``Query`` property wrapper instead.
 
+\*\* NOTE for macOS 27.0 and iOS 27.0:
+Even though Apple has added a native @Query(sectionBy:) property wrapper to SwiftData in the 27.0 versions of iOS and macOS, in order to use it seamlessly, you must duplicate the property you want to group by on the child model, and therefore denormalize your database.  This is because you cannot group the sectioned query directly by a relationship property (e.g., sectionBy: \.category.name). The underlying database engine requires the sectionBy keypath to target a persisted, primitive string/value property belonging directly to the root model.
+
+Until Apple removes this restriction, the swiftdata-sectionedquery package remains a viable alternative to solve this issue.
+
+
 ## Example
 
 Configure a sectioned query with optional sort descriptors and predicate, and include a `sectionIdentifier` parameter to indicate how to group the query results. Be sure that you choose sorting and sectioning that work together to avoid discontiguous sections. 
